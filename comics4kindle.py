@@ -6,12 +6,13 @@ import sys
 import os
 from pyquery import PyQuery as pq
 import requests
+import re
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
 HEADERS = {
-    'Host': 'manhua.178.com',
+    'Host': 'manhua.dmzj.com',
     'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; rv:16.0) Gecko/20100101 Firefox/16.0',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.5',
@@ -20,17 +21,11 @@ HEADERS = {
 }
 
 COMICS = {
-    'hz': 'haizeiwang',
-    'hy': 'huoyingrenzhe',
-    'ss': 'sishen',
-    'yj': 'yaojingdeweiba'
+    'ys': 'yuanshiwuyu',
 }
 
 COMIC_NAMES = {
-    'haizeiwang': '海贼王',
-    'huoyingrenzhe': '火影忍者',
-    'sishen': '死神',
-    'yaojingdeweiba': '妖精的尾巴'
+    'yuanshiwuyu': '源氏物语',
 }
 
 SMTP_HOST = {
@@ -44,7 +39,7 @@ SMTP_HOST = {
     'yahoo.com.cn': 'smtp.mail.yahoo.com.cn'
 }
 
-PIC_URL_PREFIX = u'http://imgfast.manhua.178.com/'
+PIC_URL_PREFIX = u'http://images.dmzj.com/'
 
 
 def fetch_chapter_url(comic_url=''):
@@ -56,17 +51,18 @@ def fetch_chapter_url(comic_url=''):
     chapter_name = comic_chapter.html() # 最新一章的名称
     print chapter_name
     print chapter_url
-    return (chapter_url, chapter_name)
+    return ('http://manhua.dmzj.com'+chapter_url, chapter_name)
 
 
 def fetch_images_url(chapter_url=''):
     req = requests.get(chapter_url, headers=HEADERS)
-    tmp_url = req.text.split('\n')[10] # html中第11行保存了图片的URL后缀
-    pic_url_str = tmp_url[len(r'''var pages = pages = '["'''): -4]
+    #print req.text
+    maxpageline = req.text.split('\n')[20] # html中第11行保存了图片的URL后缀
+    maxpage = re.search(r'\d+', maxpageline).group()
 
     pic_url_arr = [] # 保存最新一章的图片URL
-    for i in pic_url_str.replace('\/', '/').split('","'):
-        url = PIC_URL_PREFIX + urllib.quote(i.decode('unicode-escape').encode('utf8'))
+    for num in range(1, int(maxpage)):
+        url = PIC_URL_PREFIX + urllib.quote('/y/源氏物语/VOL13/'+"%03d"%num+'.jpg')
         pic_url_arr.append(url)
     return pic_url_arr
 
@@ -185,7 +181,7 @@ def send_mail(subject='', mail_from='comics4kindle@163.com', mail_to=[], filenam
 
 def main():
     if len(sys.argv) == 1:
-        comic = COMICS['hz'] # 默认为海贼王
+        comic = COMICS['ys'] # 默认
         send_to_kindle = False
     elif len(sys.argv) == 2:
         comic = COMICS[sys.argv[1]]
@@ -204,9 +200,11 @@ python comics4kindle.py [hz/hy/ss/yj] [mail_from] [mail_to] [mail_pwd] --> 发�
 """
         sys.exit(0)
         
-    comic_chapter_url = "http://manhua.178.com/%s/" % comic
+    comic_chapter_url = "http://manhua.dmzj.com/%s/" % comic
     chapter_url, chapter_name = fetch_chapter_url(comic_chapter_url)
+    print chapter_url
     pic_url_arr = fetch_images_url(chapter_url)
+    print pic_url_arr
     images_path_arr = fetch_and_sava_images(comic, chapter_name, pic_url_arr)
     html_file_path = gen_mobi_html(images_path_arr, comic, chapter_name)
     mobi_file_path = gen_mobi(comic, chapter_name, html_file_path)
